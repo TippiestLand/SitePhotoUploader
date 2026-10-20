@@ -23,8 +23,12 @@ namespace SitePhotoUploader
 
         private Button btnAddCopyLink = null!;
         private Button btnCopyLinkMenu = null!;
+        private Button btnCopyArrowMenu = null!;
         private ContextMenuStrip contextMenuClicks = null!;
+        private ContextMenuStrip contextMenuArrows = null!;
+
         private int _selectedClicks = 3;
+        private int _selectedArrows = 1;
 
         private Button btnPlayStart = null!;
         private Button btnPlayStop = null!;
@@ -91,8 +95,8 @@ namespace SitePhotoUploader
         private void BuildUi()
         {
             this.Text = "Site Photo Uploader";
-            this.Size = new Size(1350, 800);
-            this.MinimumSize = new Size(1150, 700);
+            this.Size = new Size(1450, 800); // Сделал окно еще шире для новых кнопок
+            this.MinimumSize = new Size(1250, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Font = new Font("Segoe UI", 10);
 
@@ -116,7 +120,7 @@ namespace SitePhotoUploader
             };
 
             txtFolder = new TextBox { Location = new Point(215, 12), Width = mainContentPanel.Width - 400, ReadOnly = true, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-            lblCount = new Label { Location = new Point(1100, 15), Width = 100, TextAlign = ContentAlignment.MiddleLeft, Text = "Найдено: 0", Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            lblCount = new Label { Location = new Point(1200, 15), Width = 100, TextAlign = ContentAlignment.MiddleLeft, Text = "Найдено: 0", Anchor = AnchorStyles.Top | AnchorStyles.Right };
 
             top.Controls.Add(btnChooseFolder);
             top.Controls.Add(txtFolder);
@@ -147,27 +151,36 @@ namespace SitePhotoUploader
                 }
             };
 
-            // НОВАЯ КНОПКА ОТКРЫТИЯ ФАЙЛА
             btnAddOpenFile = CreateButton("+ Открыть файл", 443, 23, 140, 32);
             btnAddOpenFile.Click += BtnAddOpenFile_Click;
 
+            // Меню для кликов
             contextMenuClicks = new ContextMenuStrip();
             contextMenuClicks.Items.Add("1 клик", null, (s, e) => SetClicks(1));
             contextMenuClicks.Items.Add("2 клика", null, (s, e) => SetClicks(2));
             contextMenuClicks.Items.Add("3 клика", null, (s, e) => SetClicks(3));
             contextMenuClicks.Items.Add("4 клика", null, (s, e) => SetClicks(4));
 
+            // Меню для стрелок
+            contextMenuArrows = new ContextMenuStrip();
+            contextMenuArrows.Items.Add("0 стрелок", null, (s, e) => SetArrows(0));
+            contextMenuArrows.Items.Add("1 стрелка", null, (s, e) => SetArrows(1));
+            contextMenuArrows.Items.Add("2 стрелки", null, (s, e) => SetArrows(2));
+            contextMenuArrows.Items.Add("3 стрелки", null, (s, e) => SetArrows(3));
+            contextMenuArrows.Items.Add("4 стрелки", null, (s, e) => SetArrows(4));
+
             btnAddCopyLink = CreateButton("+ Копировать ссылку", 588, 23, 150, 32);
             btnAddCopyLink.Click += BtnAddCopyLink_Click;
 
             btnCopyLinkMenu = CreateButton("▼", 738, 23, 30, 32);
             btnCopyLinkMenu.Font = new Font("Segoe UI", 8, FontStyle.Bold);
-            btnCopyLinkMenu.Click += (s, e) =>
-            {
-                contextMenuClicks.Show(btnCopyLinkMenu, new Point(0, btnCopyLinkMenu.Height));
-            };
+            btnCopyLinkMenu.Click += (s, e) => contextMenuClicks.Show(btnCopyLinkMenu, new Point(0, btnCopyLinkMenu.Height));
 
-            btnClearSteps = CreateButton("Очистить шаги", 785, 23, 120, 32);
+            btnCopyArrowMenu = CreateButton("↓", 768, 23, 30, 32);
+            btnCopyArrowMenu.Font = new Font("Segoe UI", 8, FontStyle.Bold);
+            btnCopyArrowMenu.Click += (s, e) => contextMenuArrows.Show(btnCopyArrowMenu, new Point(0, btnCopyArrowMenu.Height));
+
+            btnClearSteps = CreateButton("Очистить шаги", 808, 23, 120, 32);
             btnClearSteps.ForeColor = Color.DarkRed;
             btnClearSteps.Click += (s, e) =>
             {
@@ -177,8 +190,8 @@ namespace SitePhotoUploader
                 Log("Список шагов очищен.");
             };
 
-            var lblDelay = CreateLabel("Задержка (сек):", 920, 28, Color.Empty, 10, FontStyle.Regular);
-            numDelaySec = new NumericUpDown { Location = new Point(1035, 25), Width = 60, Minimum = 1, Maximum = 60, Value = 10 };
+            var lblDelay = CreateLabel("Задержка (сек):", 940, 28, Color.Empty, 10, FontStyle.Regular);
+            numDelaySec = new NumericUpDown { Location = new Point(1055, 25), Width = 60, Minimum = 1, Maximum = 60, Value = 10 };
             numDelaySec.ValueChanged += (s, e) =>
             {
                 foreach (var step in _steps) step.DelayMs = (int)numDelaySec.Value * 1000;
@@ -228,7 +241,7 @@ namespace SitePhotoUploader
             };
 
             controlPanel.Controls.AddRange(new Control[] {
-                lblRecordGroup, btnRecordStart, btnRecordStop, btnPauseRecord, btnAddOpenFile, btnAddCopyLink, btnCopyLinkMenu, btnClearSteps,
+                lblRecordGroup, btnRecordStart, btnRecordStop, btnPauseRecord, btnAddOpenFile, btnAddCopyLink, btnCopyLinkMenu, btnCopyArrowMenu, btnClearSteps,
                 lblDelay, numDelaySec, lblPlayGroup, btnPlayStart, btnPlayStop, btnSaveLinks, btnClearLinks, lblEstTime
             });
 
@@ -291,7 +304,7 @@ namespace SitePhotoUploader
                 _steps.Clear();
                 foreach (var step in tmpl.Steps)
                 {
-                    _steps.Add(new Step { Type = step.Type, Position = step.Position, DelayMs = step.DelayMs, ClickCount = step.ClickCount, InputPosition = step.InputPosition, OpenButtonPosition = step.OpenButtonPosition });
+                    _steps.Add(new Step { Type = step.Type, Position = step.Position, DelayMs = step.DelayMs, ClickCount = step.ClickCount, DownArrowCount = step.DownArrowCount, InputPosition = step.InputPosition, OpenButtonPosition = step.OpenButtonPosition });
                 }
 
                 if (_steps.Count > 0) numDelaySec.Value = _steps[0].DelayMs / 1000;
@@ -363,7 +376,7 @@ namespace SitePhotoUploader
 
         private void BtnAddOpenFile_Click(object? sender, EventArgs e)
         {
-            Log("1. Кликните туда, куда нужно вставить путь (строка ввода).");
+            Log("1. Кликните туда, куда нужно вставить путь (строка ввода в Проводнике).");
 
             _recorder.WaitForFileDialogClicks((inputPos, openBtnPos) =>
             {
@@ -379,11 +392,17 @@ namespace SitePhotoUploader
 
         private void BtnAddCopyLink_Click(object? sender, EventArgs e)
         {
-            Log($"Ожидание клика по ссылке (программа кликнет {_selectedClicks} раз(а)).");
+            Log($"Ожидание клика по ссылке. Кликните в браузере (кликнет {_selectedClicks} раз, нажмет {_selectedArrows} стрелок).");
 
             _recorder.WaitForLinkClick((clickPos) =>
             {
-                AddStep(new Step { Type = StepType.CopyLink, Position = clickPos, ClickCount = _selectedClicks });
+                AddStep(new Step
+                {
+                    Type = StepType.CopyLink,
+                    Position = clickPos,
+                    ClickCount = _selectedClicks,
+                    DownArrowCount = _selectedArrows
+                });
                 Log($"Координаты для ссылки сохранены: ({clickPos.X}, {clickPos.Y}). Шаг добавлен.");
             });
         }
@@ -393,6 +412,13 @@ namespace SitePhotoUploader
             _selectedClicks = count;
             btnCopyLinkMenu.Text = count.ToString();
             Log($"Настройка изменена: программа будет кликать {_selectedClicks} раз(а) по ссылке.");
+        }
+
+        private void SetArrows(int count)
+        {
+            _selectedArrows = count;
+            btnCopyArrowMenu.Text = count.ToString();
+            Log($"Настройка изменена: программа будет нажимать {_selectedArrows} стрелок вниз.");
         }
 
         private void DeleteSelectedTemplate()
@@ -515,7 +541,7 @@ namespace SitePhotoUploader
 
                 if (form.ShowDialog() == DialogResult.OK)
                 {
-                    var newTemplate = new TemplateData { Name = txt.Text.Trim(), Steps = _steps.Select(s => new Step { Type = s.Type, Position = s.Position, DelayMs = s.DelayMs, ClickCount = s.ClickCount, InputPosition = s.InputPosition, OpenButtonPosition = s.OpenButtonPosition }).ToList() };
+                    var newTemplate = new TemplateData { Name = txt.Text.Trim(), Steps = _steps.Select(s => new Step { Type = s.Type, Position = s.Position, DelayMs = s.DelayMs, ClickCount = s.ClickCount, DownArrowCount = s.DownArrowCount, InputPosition = s.InputPosition, OpenButtonPosition = s.OpenButtonPosition }).ToList() };
                     _templates.Add(newTemplate);
                     _templateManager.SaveTemplates(_templates);
                     LoadTemplatesToList();

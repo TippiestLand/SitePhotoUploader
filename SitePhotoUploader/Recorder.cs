@@ -221,15 +221,10 @@ namespace SitePhotoUploader
 
                                 _uiControl?.Invoke(new Action(() =>
                                 {
-                                    // Кликаем по полю ввода
                                     ClickAt(step.InputPosition);
                                     Thread.Sleep(step.DelayMs);
-
-                                    // Вставляем путь
                                     dialogHelper.InsertPath(path);
                                     Thread.Sleep(step.DelayMs);
-
-                                    // Кликаем по кнопке открыть
                                     ClickAt(step.OpenButtonPosition);
                                 }));
 
@@ -249,7 +244,7 @@ namespace SitePhotoUploader
                                         if (edgeHandle != IntPtr.Zero) SetForegroundWindow(edgeHandle);
                                         Thread.Sleep(500);
 
-                                        // 1. Выделяем текст (кликаем)
+                                        // 1. Выделяем
                                         for (int i = 0; i < step.ClickCount; i++)
                                         {
                                             ClickAt(step.Position);
@@ -257,25 +252,28 @@ namespace SitePhotoUploader
                                         }
                                         Thread.Sleep(300);
 
-                                        // 2. Жмем правую кнопку мыши
+                                        // 2. ПКМ
                                         RightClickAt(step.Position);
 
-                                        // 3. ВАША НОВАЯ ЗАДЕРЖКА (1 секунда), чтобы меню успело появиться
+                                        // 3. Задержка
                                         Thread.Sleep(1000);
 
-                                        // 4. Нажимаем 'c' (Копировать) и Enter
-                                        SendKeys.SendWait("c");
-                                        Thread.Sleep(300);
+                                        // 4. Стрелки вниз
+                                        for (int i = 0; i < step.DownArrowCount; i++)
+                                        {
+                                            SendKeys.SendWait("{DOWN}");
+                                            Thread.Sleep(200);
+                                        }
+
+                                        // 5. Enter
                                         SendKeys.SendWait("{ENTER}");
                                         Thread.Sleep(500);
 
-                                        // 5. Читаем из буфера
+                                        // 6. Читаем
                                         if (Clipboard.ContainsText())
                                         {
                                             link = Clipboard.GetText().Trim();
                                         }
-
-                                        // Закрываем меню
                                         SendKeys.SendWait("{ESC}");
                                     }));
 

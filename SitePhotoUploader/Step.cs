@@ -12,21 +12,21 @@ namespace SitePhotoUploader
     public class Step
     {
         public StepType Type { get; set; }
-        public Point Position { get; set; } // Для обычных кликов и кликов по ссылке
+        public Point Position { get; set; }
         public int DelayMs { get; set; } = 10000;
-        public int ClickCount { get; set; } = 3;
+        public int ClickCount { get; set; } = 3;      // Клики по ссылке
+        public int DownArrowCount { get; set; } = 1;  // Стрелки вниз в меню
 
-        // Новые поля для шага "Открыть файл"
-        public Point InputPosition { get; set; } // Куда кликнуть, чтобы вставить путь
-        public Point OpenButtonPosition { get; set; } // Куда кликнуть, чтобы нажать "Открыть"
+        public Point InputPosition { get; set; }
+        public Point OpenButtonPosition { get; set; }
 
         public override string ToString()
         {
             return Type switch
             {
                 StepType.Click => $"Клик ({Position.X}, {Position.Y})",
-                StepType.OpenFileDialog => $"Открыть файл (ввод: {InputPosition.X},{InputPosition.Y}, кнопка: {OpenButtonPosition.X},{OpenButtonPosition.Y})",
-                StepType.CopyLink => $"Скопировать ссылку ({ClickCount} клика)",
+                StepType.OpenFileDialog => $"Открыть файл",
+                StepType.CopyLink => $"Скопировать ссылку ({ClickCount} клика, {DownArrowCount} стрелок)",
                 _ => "Неизвестно"
             };
         }
