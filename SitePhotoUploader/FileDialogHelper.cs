@@ -1,104 +1,100 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using System.Threading;
-using System.Windows.Forms;
+using System.Windows.Automation;
 
 namespace SitePhotoUploader
 {
     public class FileDialogHelper
     {
-        private const int WM_SETTEXT = 0x000C;
-        private const int BM_CLICK = 0x00F5;
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-
         public bool SelectFileInOpenDialog(string filePath, int timeoutMs = 5000)
         {
+            // Ждем 2 секунды
             Thread.Sleep(2000);
 
-            IntPtr dialogHandle = IntPtr.Zero;
-            DateTime deadline = DateTime.Now.AddMilliseconds(timeoutMs);
-
-            while (DateTime.Now < deadline)
+            // Ищем открывшееся окно Проводника
+            var dialog = FindOpenDialog(timeoutMs);
+            if (dialog == null)
             {
-                dialogHandle = FindWindow("#32770", "Open");
-                if (dialogHandle == IntPtr.Zero) dialogHandle = FindWindow("#32770", "Открыть");
-                if (dialogHandle != IntPtr.Zero) break;
-                Thread.Sleep(500);
+                return false; // Окно не найдено
             }
 
-            if (dialogHandle == IntPtr.Zero) return false;
+            // 1. Находим поле ввода (куда вставлять путь к файлу)
+            var edit = FindElementByControlType(dialog, ControlType.Edit);
+            if (edit == null) return false;
 
-            SetForegroundWindow(dialogHandle);
-            Thread.Sleep(5000);
-
-            try
+            // 2. Вставляем путь
+            if (edit.TryGetCurrentPattern(ValuePattern.Pattern, out object valuePatternObj))
             {
-                IntPtr editHandle = FindEditControl(dialogHandle);
-                if (editHandle != IntPtr.Zero)
-                {
-                    SendMessage(editHandle, WM_SETTEXT, IntPtr.Zero, filePath);
-                    Thread.Sleep(2000);
-                }
-                else
-                {
-                    Clipboard.SetText(filePath);
-                    SendKeys.SendWait("^v");
-                    Thread.Sleep(2000);
-                }
-
-                IntPtr openButton = FindWindowEx(dialogHandle, IntPtr.Zero, "Button", "&Open");
-                if (openButton == IntPtr.Zero) openButton = FindWindowEx(dialogHandle, IntPtr.Zero, "Button", "Открыть");
-
-                if (openButton != IntPtr.Zero)
-                {
-                    SendMessage(openButton, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
-                }
-                else
-                {
-                    SendMessage(dialogHandle, 0x0100, (IntPtr)0x0D, IntPtr.Zero);
-                    SendMessage(dialogHandle, 0x0101, (IntPtr)0x0D, IntPtr.Zero);
-                }
-                return true;
+                ((ValuePattern)valuePatternObj).SetValue(filePath);
             }
-            catch { return false; }
+            else
+            {
+                // Если не сработало, пробуем кликнуть и отправить текст
+                edit.SetFocus();
+                Thread.Sleep(200);
+                System.Windows.Forms.SendKeys.SendWait(filePath);
+            }
+
+            Thread.Sleep(500); // Даем время на ввод
+
+            // 3. Находим кнопку "Открыть" (Open) или "Сохранить"
+            var openButton = FindElementByName(dialog, "Открыть")
+                          ?? FindElementByName(dialog, "Open")
+                          ?? FindElementByName(dialog, "&Open");
+
+            if (openButton != null)
+            {
+                // Нажимаем кнопку
+                if (openButton.TryGetCurrentPattern(InvokePattern.Pattern, out object invokePatternObj))
+                {
+                    ((InvokePattern)invokePatternObj).Invoke();
+                    return true;
+                }
+            }
+
+            // Если кнопку не нашли, просто жмем Enter
+            System.Windows.Forms.SendKeys.SendWait("{ENTER}");
+            return true;
         }
 
-        private IntPtr FindEditControl(IntPtr parent)
+        private AutomationElement FindOpenDialog(int timeoutMs)
         {
-            IntPtr comboBoxEx = FindWindowEx(parent, IntPtr.Zero, "ComboBoxEx32", null);
-            if (comboBoxEx != IntPtr.Zero)
-            {
-                IntPtr comboBox = FindWindowEx(comboBoxEx, IntPtr.Zero, "ComboBox", null);
-                if (comboBox != IntPtr.Zero)
-                {
-                    IntPtr edit = FindWindowEx(comboBox, IntPtr.Zero, "Edit", null);
-                    if (edit != IntPtr.Zero) return edit;
-                }
-            }
-            IntPtr simpleEdit = FindWindowEx(parent, IntPtr.Zero, "Edit", null);
-            if (simpleEdit != IntPtr.Zero) return simpleEdit;
+            DateTime endTime = DateTime.Now.AddMilliseconds(timeoutMs);
 
-            IntPtr directUI = FindWindowEx(parent, IntPtr.Zero, "DirectUIHWND", null);
-            if (directUI != IntPtr.Zero)
+            while (DateTime.Now < endTime)
             {
-                IntPtr edit = FindWindowEx(directUI, IntPtr.Zero, "Edit", null);
-                if (edit != IntPtr.Zero) return edit;
+                var desktop = AutomationElement.RootElement;
+                var windows = desktop.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window));
+
+                foreach (AutomationElement window in windows)
+                {
+                    try
+                    {
+                        string name = window.Current.Name ?? "";
+
+                        if (name.Contains("Открыть") || name.Contains("Open") ||
+                            name.Contains("Выбор файла") || name.Contains("Choose File"))
+                        {
+                            return window;
+                        }
+                    }
+                    catch { }
+                }
+                Thread.Sleep(500);
             }
-            return IntPtr.Zero;
+            return null;
+        }
+
+        private AutomationElement FindElementByControlType(AutomationElement parent, ControlType type)
+        {
+            var condition = new PropertyCondition(AutomationElement.ControlTypeProperty, type);
+            return parent.FindFirst(TreeScope.Descendants, condition);
+        }
+
+        private AutomationElement FindElementByName(AutomationElement parent, string name)
+        {
+            var condition = new PropertyCondition(AutomationElement.NameProperty, name);
+            return parent.FindFirst(TreeScope.Descendants, condition);
         }
     }
 }
