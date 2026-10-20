@@ -14,14 +14,11 @@ namespace SitePhotoUploader
                 Clipboard.Clear();
                 Clipboard.SetText(filePath);
 
-                // 2. Ждем, пока Windows обновит буфер (очень частая причина сбоев)
+                // 2. Ждем, пока Windows обновит буфер
                 Thread.Sleep(500);
 
-                // 3. Вставляем. Отправляем дважды на случай потери фокуса
+                // 3. Вставляем ОДИН раз
                 SendKeys.SendWait("^v");
-                Thread.Sleep(300);
-                SendKeys.SendWait("^v");
-                Thread.Sleep(500); // Ждем, пока текст появится в строке
             }
             catch { }
         }

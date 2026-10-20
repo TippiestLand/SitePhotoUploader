@@ -55,8 +55,7 @@ namespace SitePhotoUploader
         private bool _isPlaying;
         private bool _isPaused = false;
 
-        // Ожидание кликов
-        private int _waitingMode = 0; // 0 - ничего, 1 - ждем ссылку, 2 - ждем поле ввода, 3 - ждем кнопку открыть
+        private int _waitingMode = 0;
         private Point _savedPoint = Point.Empty;
         private Action<Point>? _onLinkCaptured;
         private Action<Point, Point>? _onFileDialogCaptured;
@@ -125,7 +124,7 @@ namespace SitePhotoUploader
         {
             _onFileDialogCaptured = onCaptured;
             _waitingMode = 2;
-            StartTimeout(20); // Больше времени, так как два клика
+            StartTimeout(20);
         }
 
         private void StartTimeout(int seconds)
@@ -173,7 +172,7 @@ namespace SitePhotoUploader
                     {
                         _savedPoint = clickPoint;
                         _waitingMode = 3;
-                        OnLog?.Invoke($"Точка ввода пути: ({clickPoint.X}, {clickPoint.Y}). Теперь кликните по кнопке 'Открыть' или 'Enter'.");
+                        OnLog?.Invoke($"Точка ввода пути: ({clickPoint.X}, {clickPoint.Y}). Теперь кликните по кнопке 'Открыть'.");
                     }
                     else if (_waitingMode == 3) // Ждем кнопку Открыть
                     {
@@ -182,7 +181,7 @@ namespace SitePhotoUploader
                         _onFileDialogCaptured?.Invoke(_savedPoint, clickPoint);
                         OnLog?.Invoke($"Точка кнопки: ({clickPoint.X}, {clickPoint.Y}). Шаг добавлен.");
                     }
-                    else if (_isRecording && !_isPaused) // Обычный клик
+                    else if (_isRecording && !_isPaused)
                     {
                         OnClickRecorded?.Invoke(clickPoint);
                     }
@@ -215,18 +214,24 @@ namespace SitePhotoUploader
                             }
                             else if (step.Type == StepType.OpenFileDialog)
                             {
-                                Thread.Sleep(2000);
+                                // Ждем первую задержку (пока откроется окно)
+                                Thread.Sleep(step.DelayMs);
+
                                 string path = fileManager.GetFile(imageIndex);
                                 if (path == null) return;
 
-                                // Кликаем по полю ввода пути, вставляем, кликаем по кнопке
                                 _uiControl?.Invoke(new Action(() =>
                                 {
-                                    ClickAt(step.InputPosition); // Клик в поле
-                                    Thread.Sleep(500);
-                                    dialogHelper.InsertPath(path); // Ctrl+V
-                                    Thread.Sleep(300);
-                                    ClickAt(step.OpenButtonPosition); // Клик по кнопке открыть
+                                    // 1. Клик по полю ввода
+                                    ClickAt(step.InputPosition);
+                                    Thread.Sleep(step.DelayMs); // Задержка из настроек
+
+                                    // 2. Вставка пути (внутри FileDialogHelper есть пауза 500мс на буфер)
+                                    dialogHelper.InsertPath(path);
+                                    Thread.Sleep(step.DelayMs); // Задержка из настроек
+
+                                    // 3. Клик по кнопке "Открыть"
+                                    ClickAt(step.OpenButtonPosition);
                                 }));
 
                                 OnLog?.Invoke($"Вставлен путь: {System.IO.Path.GetFileName(path)}");
