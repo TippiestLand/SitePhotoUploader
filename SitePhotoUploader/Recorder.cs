@@ -161,20 +161,20 @@ namespace SitePhotoUploader
                 {
                     var clickPoint = new Point(hookStruct.pt.X, hookStruct.pt.Y);
 
-                    if (_waitingMode == 1) // Ждем ссылку
+                    if (_waitingMode == 1)
                     {
                         _waitingMode = 0;
                         _timeoutTimer?.Stop();
                         _onLinkCaptured?.Invoke(clickPoint);
                         OnLog?.Invoke($"Координаты ссылки: ({clickPoint.X}, {clickPoint.Y})");
                     }
-                    else if (_waitingMode == 2) // Ждем поле ввода
+                    else if (_waitingMode == 2)
                     {
                         _savedPoint = clickPoint;
                         _waitingMode = 3;
                         OnLog?.Invoke($"Точка ввода пути: ({clickPoint.X}, {clickPoint.Y}). Теперь кликните по кнопке 'Открыть'.");
                     }
-                    else if (_waitingMode == 3) // Ждем кнопку Открыть
+                    else if (_waitingMode == 3)
                     {
                         _waitingMode = 0;
                         _timeoutTimer?.Stop();
@@ -214,7 +214,6 @@ namespace SitePhotoUploader
                             }
                             else if (step.Type == StepType.OpenFileDialog)
                             {
-                                // Ждем первую задержку (пока откроется окно)
                                 Thread.Sleep(step.DelayMs);
 
                                 string path = fileManager.GetFile(imageIndex);
@@ -222,15 +221,15 @@ namespace SitePhotoUploader
 
                                 _uiControl?.Invoke(new Action(() =>
                                 {
-                                    // 1. Клик по полю ввода
+                                    // Кликаем по полю ввода
                                     ClickAt(step.InputPosition);
-                                    Thread.Sleep(step.DelayMs); // Задержка из настроек
+                                    Thread.Sleep(step.DelayMs);
 
-                                    // 2. Вставка пути (внутри FileDialogHelper есть пауза 500мс на буфер)
+                                    // Вставляем путь
                                     dialogHelper.InsertPath(path);
-                                    Thread.Sleep(step.DelayMs); // Задержка из настроек
+                                    Thread.Sleep(step.DelayMs);
 
-                                    // 3. Клик по кнопке "Открыть"
+                                    // Кликаем по кнопке открыть
                                     ClickAt(step.OpenButtonPosition);
                                 }));
 
@@ -250,6 +249,7 @@ namespace SitePhotoUploader
                                         if (edgeHandle != IntPtr.Zero) SetForegroundWindow(edgeHandle);
                                         Thread.Sleep(500);
 
+                                        // 1. Выделяем текст (кликаем)
                                         for (int i = 0; i < step.ClickCount; i++)
                                         {
                                             ClickAt(step.Position);
@@ -257,22 +257,31 @@ namespace SitePhotoUploader
                                         }
                                         Thread.Sleep(300);
 
+                                        // 2. Жмем правую кнопку мыши
                                         RightClickAt(step.Position);
+
+                                        // 3. ВАША НОВАЯ ЗАДЕРЖКА (1 секунда), чтобы меню успело появиться
+                                        Thread.Sleep(1000);
+
+                                        // 4. Нажимаем 'c' (Копировать) и Enter
+                                        SendKeys.SendWait("c");
+                                        Thread.Sleep(300);
+                                        SendKeys.SendWait("{ENTER}");
                                         Thread.Sleep(500);
 
-                                        SendKeys.SendWait("c");
-                                        Thread.Sleep(200);
-                                        SendKeys.SendWait("{ENTER}");
-                                        Thread.Sleep(300);
-
+                                        // 5. Читаем из буфера
                                         if (Clipboard.ContainsText())
                                         {
                                             link = Clipboard.GetText().Trim();
                                         }
+
+                                        // Закрываем меню
                                         SendKeys.SendWait("{ESC}");
                                     }));
 
                                     if (!string.IsNullOrEmpty(link)) break;
+
+                                    OnLog?.Invoke($"Попытка {attempt}: не удалось, пробую еще...");
                                     Thread.Sleep(1000);
                                 }
 
