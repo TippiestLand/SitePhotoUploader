@@ -46,8 +46,8 @@ namespace SitePhotoUploader
 
         private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
         private const uint MOUSEEVENTF_LEFTUP = 0x0004;
-        private const uint MOUSEEVENTF_RIGHTDOWN = 0x0008; // Для правой кнопки
-        private const uint MOUSEEVENTF_RIGHTUP = 0x0010;   // Для правой кнопки
+        private const uint MOUSEEVENTF_RIGHTDOWN = 0x0008;
+        private const uint MOUSEEVENTF_RIGHTUP = 0x0010;
 
         private IntPtr _hookId = IntPtr.Zero;
         private LowLevelMouseProc _proc;
@@ -55,16 +55,19 @@ namespace SitePhotoUploader
         private bool _isPlaying;
         private bool _isPaused = false;
 
-        private bool _isWaitingForLinkClick = false;
-        private Action<Point>? _onLinkCoordinatesCaptured;
-        private System.Windows.Forms.Timer? _linkTimeoutTimer;
+        // Ожидание кликов
+        private int _waitingMode = 0; // 0 - ничего, 1 - ждем ссылку, 2 - ждем поле ввода, 3 - ждем кнопку открыть
+        private Point _savedPoint = Point.Empty;
+        private Action<Point>? _onLinkCaptured;
+        private Action<Point, Point>? _onFileDialogCaptured;
+        private System.Windows.Forms.Timer? _timeoutTimer;
 
         private IntPtr _formHandle;
         private Control _uiControl;
 
         public event Action<Point> OnClickRecorded;
         public event Action<string> OnLog;
-        public event Action<string> OnLinkCaptured;
+        public event Action<string> OnLinkCapturedEvent;
 
         public bool IsRecording => _isRecording;
         public bool IsPlaying => _isPlaying;
@@ -93,7 +96,7 @@ namespace SitePhotoUploader
             _hookId = IntPtr.Zero;
             _isRecording = false;
             _isPaused = false;
-            _isWaitingForLinkClick = false;
+            _waitingMode = 0;
             OnLog?.Invoke("Запись кликов остановлена.");
         }
 
@@ -111,24 +114,35 @@ namespace SitePhotoUploader
             OnLog?.Invoke("▶ Запись продолжена.");
         }
 
-        public void WaitForSingleClick(Action<Point> onCaptured)
+        public void WaitForLinkClick(Action<Point> onCaptured)
         {
-            _onLinkCoordinatesCaptured = onCaptured;
-            _isWaitingForLinkClick = true;
+            _onLinkCaptured = onCaptured;
+            _waitingMode = 1;
+            StartTimeout(10);
+        }
 
-            _linkTimeoutTimer?.Stop();
-            _linkTimeoutTimer?.Dispose();
-            _linkTimeoutTimer = new System.Windows.Forms.Timer { Interval = 10000 };
-            _linkTimeoutTimer.Tick += (s, e) =>
+        public void WaitForFileDialogClicks(Action<Point, Point> onCaptured)
+        {
+            _onFileDialogCaptured = onCaptured;
+            _waitingMode = 2;
+            StartTimeout(20); // Больше времени, так как два клика
+        }
+
+        private void StartTimeout(int seconds)
+        {
+            _timeoutTimer?.Stop();
+            _timeoutTimer?.Dispose();
+            _timeoutTimer = new System.Windows.Forms.Timer { Interval = seconds * 1000 };
+            _timeoutTimer.Tick += (s, e) =>
             {
-                if (_isWaitingForLinkClick)
+                if (_waitingMode != 0)
                 {
-                    _isWaitingForLinkClick = false;
-                    _linkTimeoutTimer?.Stop();
-                    OnLog?.Invoke("ОШИБКА: Время ожидания клика по ссылке истекло (10 сек).");
+                    _waitingMode = 0;
+                    _timeoutTimer?.Stop();
+                    OnLog?.Invoke("ОШИБКА: Время ожидания кликов истекло.");
                 }
             };
-            _linkTimeoutTimer.Start();
+            _timeoutTimer.Start();
         }
 
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -146,17 +160,31 @@ namespace SitePhotoUploader
 
                 if (!isOurWindow)
                 {
-                    if (_isWaitingForLinkClick)
+                    var clickPoint = new Point(hookStruct.pt.X, hookStruct.pt.Y);
+
+                    if (_waitingMode == 1) // Ждем ссылку
                     {
-                        _isWaitingForLinkClick = false;
-                        _linkTimeoutTimer?.Stop();
-                        var clickPoint = new Point(hookStruct.pt.X, hookStruct.pt.Y);
-                        _onLinkCoordinatesCaptured?.Invoke(clickPoint);
-                        OnLog?.Invoke($"Координаты для ссылки сохранены: ({clickPoint.X}, {clickPoint.Y})");
+                        _waitingMode = 0;
+                        _timeoutTimer?.Stop();
+                        _onLinkCaptured?.Invoke(clickPoint);
+                        OnLog?.Invoke($"Координаты ссылки: ({clickPoint.X}, {clickPoint.Y})");
                     }
-                    else if (_isRecording && !_isPaused)
+                    else if (_waitingMode == 2) // Ждем поле ввода
                     {
-                        OnClickRecorded?.Invoke(new Point(hookStruct.pt.X, hookStruct.pt.Y));
+                        _savedPoint = clickPoint;
+                        _waitingMode = 3;
+                        OnLog?.Invoke($"Точка ввода пути: ({clickPoint.X}, {clickPoint.Y}). Теперь кликните по кнопке 'Открыть' или 'Enter'.");
+                    }
+                    else if (_waitingMode == 3) // Ждем кнопку Открыть
+                    {
+                        _waitingMode = 0;
+                        _timeoutTimer?.Stop();
+                        _onFileDialogCaptured?.Invoke(_savedPoint, clickPoint);
+                        OnLog?.Invoke($"Точка кнопки: ({clickPoint.X}, {clickPoint.Y}). Шаг добавлен.");
+                    }
+                    else if (_isRecording && !_isPaused) // Обычный клик
+                    {
+                        OnClickRecorded?.Invoke(clickPoint);
                     }
                 }
             }
@@ -191,8 +219,17 @@ namespace SitePhotoUploader
                                 string path = fileManager.GetFile(imageIndex);
                                 if (path == null) return;
 
-                                bool ok = dialogHelper.SelectFileInOpenDialog(path);
-                                OnLog?.Invoke(ok ? $"Вставлен путь: {System.IO.Path.GetFileName(path)}" : "Не удалось вставить путь");
+                                // Кликаем по полю ввода пути, вставляем, кликаем по кнопке
+                                _uiControl?.Invoke(new Action(() =>
+                                {
+                                    ClickAt(step.InputPosition); // Клик в поле
+                                    Thread.Sleep(500);
+                                    dialogHelper.InsertPath(path); // Ctrl+V
+                                    Thread.Sleep(300);
+                                    ClickAt(step.OpenButtonPosition); // Клик по кнопке открыть
+                                }));
+
+                                OnLog?.Invoke($"Вставлен путь: {System.IO.Path.GetFileName(path)}");
                                 Thread.Sleep(step.DelayMs);
                             }
                             else if (step.Type == StepType.CopyLink)
@@ -204,13 +241,10 @@ namespace SitePhotoUploader
                                 {
                                     _uiControl?.Invoke(new Action(() =>
                                     {
-                                        // 1. Находим окно Edge и принудительно активируем его
                                         IntPtr edgeHandle = FindWindow("Chrome_WidgetWin_1", null);
                                         if (edgeHandle != IntPtr.Zero) SetForegroundWindow(edgeHandle);
                                         Thread.Sleep(500);
 
-                                        // 2. Кликаем ЛЕВОЙ кнопкой мыши (чтобы выделить)
-                                        OnLog?.Invoke($"Выделяю текст ({step.ClickCount} клика)...");
                                         for (int i = 0; i < step.ClickCount; i++)
                                         {
                                             ClickAt(step.Position);
@@ -218,44 +252,35 @@ namespace SitePhotoUploader
                                         }
                                         Thread.Sleep(300);
 
-                                        // 3. Кликаем ПРАВОЙ кнопкой мыши (вызываем контекстное меню)
-                                        OnLog?.Invoke("Вызываю контекстное меню (ПКМ)...");
                                         RightClickAt(step.Position);
-                                        Thread.Sleep(500); // Ждем открытия меню
+                                        Thread.Sleep(500);
 
-                                        // 4. Нажимаем 'c' или Enter (обычно "Копировать" в меню)
                                         SendKeys.SendWait("c");
                                         Thread.Sleep(200);
-                                        SendKeys.SendWait("{ENTER}"); // На всякий случай жмем Enter
+                                        SendKeys.SendWait("{ENTER}");
                                         Thread.Sleep(300);
 
-                                        // 5. Читаем буфер
                                         if (Clipboard.ContainsText())
                                         {
                                             link = Clipboard.GetText().Trim();
                                         }
-
-                                        // Закрываем меню, если оно осталось открытым (Esc)
                                         SendKeys.SendWait("{ESC}");
                                     }));
 
                                     if (!string.IsNullOrEmpty(link)) break;
-
-                                    OnLog?.Invoke($"Попытка {attempt}: не удалось, пробую еще...");
                                     Thread.Sleep(1000);
                                 }
 
                                 if (!string.IsNullOrEmpty(link))
                                 {
                                     OnLog?.Invoke($"Скопирована ссылка: {link}");
-                                    OnLinkCaptured?.Invoke(link);
+                                    OnLinkCapturedEvent?.Invoke(link);
                                 }
                                 else
                                 {
                                     OnLog?.Invoke("ОШИБКА: не удалось скопировать ссылку.");
                                 }
 
-                                // Закрываем окно "Изображение" (нажимаем Esc)
                                 Thread.Sleep(300);
                                 _uiControl?.Invoke(new Action(() => SendKeys.SendWait("{ESC}")));
                                 Thread.Sleep(step.DelayMs);
@@ -295,7 +320,6 @@ namespace SitePhotoUploader
             mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
         }
 
-        // Новый метод: клик правой кнопкой мыши
         public static void RightClickAt(Point p)
         {
             SetCursorPos(p.X, p.Y);

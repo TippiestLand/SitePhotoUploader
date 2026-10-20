@@ -9,9 +9,6 @@ namespace SitePhotoUploader
 {
     public partial class Form1 : Form
     {
-        // ... поля остаются такими же, как в прошлом сообщении ...
-        // (Для экономии места я не дублирую все объявления полей, они не менялись)
-
         private TextBox txtFolder = null!;
         private Button btnChooseFolder = null!;
         private Label lblCount = null!;
@@ -79,7 +76,7 @@ namespace SitePhotoUploader
             };
 
             _recorder.OnLog += Log;
-            _recorder.OnLinkCaptured += link =>
+            _recorder.OnLinkCapturedEvent += link =>
             {
                 if (!_links.Contains(link))
                 {
@@ -93,9 +90,6 @@ namespace SitePhotoUploader
 
         private void BuildUi()
         {
-            // ... Код BuildUi остается без изменений, как в предыдущем сообщении ...
-            // Я привожу его полностью, чтобы вы могли просто скопировать.
-
             this.Text = "Site Photo Uploader";
             this.Size = new Size(1350, 800);
             this.MinimumSize = new Size(1150, 700);
@@ -153,8 +147,9 @@ namespace SitePhotoUploader
                 }
             };
 
+            // НОВАЯ КНОПКА ОТКРЫТИЯ ФАЙЛА
             btnAddOpenFile = CreateButton("+ Открыть файл", 443, 23, 140, 32);
-            btnAddOpenFile.Click += (s, e) => { AddStep(new Step { Type = StepType.OpenFileDialog }); Log("Добавлен шаг: открытие файла"); };
+            btnAddOpenFile.Click += BtnAddOpenFile_Click;
 
             contextMenuClicks = new ContextMenuStrip();
             contextMenuClicks.Items.Add("1 клик", null, (s, e) => SetClicks(1));
@@ -274,6 +269,7 @@ namespace SitePhotoUploader
             mainContentPanel.Controls.Add(controlPanel);
             mainContentPanel.Controls.Add(top);
 
+            // ===== ЛЕВАЯ ПАНЕЛЬ: ШАБЛОНЫ =====
             btnToggleTemplates = new Button { Text = "▶", Dock = DockStyle.Left, Width = 28, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10, FontStyle.Bold), BackColor = Color.FromArgb(230, 230, 230), Cursor = Cursors.Hand };
             btnToggleTemplates.FlatAppearance.BorderSize = 0;
             btnToggleTemplates.Click += (s, e) => ToggleTemplates();
@@ -295,7 +291,7 @@ namespace SitePhotoUploader
                 _steps.Clear();
                 foreach (var step in tmpl.Steps)
                 {
-                    _steps.Add(new Step { Type = step.Type, Position = step.Position, DelayMs = step.DelayMs, ClickCount = step.ClickCount });
+                    _steps.Add(new Step { Type = step.Type, Position = step.Position, DelayMs = step.DelayMs, ClickCount = step.ClickCount, InputPosition = step.InputPosition, OpenButtonPosition = step.OpenButtonPosition });
                 }
 
                 if (_steps.Count > 0) numDelaySec.Value = _steps[0].DelayMs / 1000;
@@ -310,6 +306,7 @@ namespace SitePhotoUploader
 
             pnlTemplates.Controls.AddRange(new Control[] { btnLoadTemplate, btnDeleteTemplate, spacer, cmbTemplates, btnSaveTemplate, lblTemplatesTitle });
 
+            // ===== ПРАВАЯ ПАНЕЛЬ: ИНСТРУКЦИЯ =====
             btnToggleHelp = new Button { Text = "◀", Dock = DockStyle.Right, Width = 28, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10, FontStyle.Bold), BackColor = Color.FromArgb(230, 230, 230), Cursor = Cursors.Hand };
             btnToggleHelp.FlatAppearance.BorderSize = 0;
             btnToggleHelp.Click += (s, e) => ToggleHelp();
@@ -329,29 +326,23 @@ namespace SitePhotoUploader
                         <style>
                             body { font-family: 'Segoe UI', Arial; font-size: 13px; color: #333; margin: 0; padding: 5px; }
                             h2 { font-size: 16px; color: #005c51; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 15px; }
-                            h3 { font-size: 14px; color: #444; margin-bottom: 5px; }
                             ul { padding-left: 20px; margin-top: 5px; }
                             li { margin-bottom: 6px; line-height: 1.4; }
-                            .num { font-weight: bold; color: #0078d7; }
                             .warn { background: #fff3cd; padding: 8px; border-radius: 4px; border-left: 4px solid #ffc107; font-size: 12px; }
-                            .tip { background: #d1ecf1; padding: 8px; border-radius: 4px; border-left: 4px solid #17a2b8; font-size: 12px; }
                         </style>
                     </head>
                     <body>
-                        <h2>🚀 Базовый сценарий</h2>
+                        <h2>🚀 Инструкция</h2>
                         <ol>
                             <li>Выберите папку с картинками.</li>
                             <li>Нажмите <b>«● Начать запись»</b>.</li>
                             <li>Кликайте по сайту до кнопки выбора файла.</li>
                             <li>Кликните «Choose File» (откроется Проводник).</li>
-                            <li>В программе нажмите <b>«⏸ Пауза записи»</b>.</li>
-                            <li>Выберите файл и нажмите «Открыть».</li>
+                            <li>Нажмите <b>«⏸ Пауза записи»</b>.</li>
+                            <li>Нажмите <b>«+ Открыть файл»</b>. Программа попросит кликнуть по строке поиска, а затем по кнопке «Открыть».</li>
                             <li>Вернитесь в программу и нажмите <b>«▶ Продолжить»</b>.</li>
-                            <li>Нажмите <b>«+ Открыть файл»</b>.</li>
                             <li>На сайте нажмите «Сохранить».</li>
-                            <li>Когда появится окно с выделенной ссылкой, нажмите <b>«⏸ Пауза записи»</b>.</li>
-                            <li>Нажмите <b>«+ Копировать ссылку»</b> и <b>один раз кликните по самой ссылке</b> в браузере (программа запишет это место).</li>
-                            <li>Стрелочкой <b>▼</b> настройте, сколько раз программа кликнет по ссылке (1-4).</li>
+                            <li>Когда появится окно с выделенной ссылкой, нажмите <b>«+ Копировать ссылку»</b> и <b>один раз кликните по самой ссылке</b>.</li>
                             <li>Нажмите <b>«■ Стоп запись»</b>.</li>
                             <li>Задайте задержку.</li>
                             <li>Нажмите <b>«▶ Начать цикл»</b>.</li>
@@ -370,11 +361,27 @@ namespace SitePhotoUploader
             this.Controls.Add(btnToggleTemplates);
         }
 
+        private void BtnAddOpenFile_Click(object? sender, EventArgs e)
+        {
+            Log("1. Кликните туда, куда нужно вставить путь (строка ввода).");
+
+            _recorder.WaitForFileDialogClicks((inputPos, openBtnPos) =>
+            {
+                AddStep(new Step
+                {
+                    Type = StepType.OpenFileDialog,
+                    InputPosition = inputPos,
+                    OpenButtonPosition = openBtnPos
+                });
+                Log($"Запомнены точки: ввод ({inputPos.X}, {inputPos.Y}), кнопка ({openBtnPos.X}, {openBtnPos.Y}). Шаг добавлен.");
+            });
+        }
+
         private void BtnAddCopyLink_Click(object? sender, EventArgs e)
         {
-            Log($"Ожидание клика по ссылке. Кликните в браузере (программа кликнет {_selectedClicks} раз(а)).");
+            Log($"Ожидание клика по ссылке (программа кликнет {_selectedClicks} раз(а)).");
 
-            _recorder.WaitForSingleClick((clickPos) =>
+            _recorder.WaitForLinkClick((clickPos) =>
             {
                 AddStep(new Step { Type = StepType.CopyLink, Position = clickPos, ClickCount = _selectedClicks });
                 Log($"Координаты для ссылки сохранены: ({clickPos.X}, {clickPos.Y}). Шаг добавлен.");
@@ -508,7 +515,7 @@ namespace SitePhotoUploader
 
                 if (form.ShowDialog() == DialogResult.OK)
                 {
-                    var newTemplate = new TemplateData { Name = txt.Text.Trim(), Steps = _steps.Select(s => new Step { Type = s.Type, Position = s.Position, DelayMs = s.DelayMs, ClickCount = s.ClickCount }).ToList() };
+                    var newTemplate = new TemplateData { Name = txt.Text.Trim(), Steps = _steps.Select(s => new Step { Type = s.Type, Position = s.Position, DelayMs = s.DelayMs, ClickCount = s.ClickCount, InputPosition = s.InputPosition, OpenButtonPosition = s.OpenButtonPosition }).ToList() };
                     _templates.Add(newTemplate);
                     _templateManager.SaveTemplates(_templates);
                     LoadTemplatesToList();
