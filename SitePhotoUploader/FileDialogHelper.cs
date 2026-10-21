@@ -7,11 +7,9 @@ namespace SitePhotoUploader
 {
     public class FileDialogHelper
     {
-        // WinAPI для прямой отправки текста
         private const int WM_SETTEXT = 0x000C;
         private const int WM_KEYDOWN = 0x0100;
         private const int WM_KEYUP = 0x0101;
-        private const int WM_CHAR = 0x0102;
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam);
@@ -38,35 +36,44 @@ namespace SitePhotoUploader
         {
             try
             {
-                // 1. Находим окно Проводника
-                IntPtr dialogHandle = FindWindow("#32770", "Открыть");
-                if (dialogHandle == IntPtr.Zero)
-                    dialogHandle = FindWindow("#32770", "Open");
+                // 1. Ищем окно Проводника (Open/Открыть)
+                IntPtr dialogHandle = IntPtr.Zero;
+                DateTime endTime = DateTime.Now.AddSeconds(5);
+
+                while (DateTime.Now < endTime)
+                {
+                    dialogHandle = FindWindow("#32770", "Открыть");
+                    if (dialogHandle == IntPtr.Zero)
+                        dialogHandle = FindWindow("#32770", "Open");
+
+                    if (dialogHandle != IntPtr.Zero) break;
+                    Thread.Sleep(300);
+                }
 
                 if (dialogHandle != IntPtr.Zero)
                 {
+                    // 2. Активируем окно
                     SetForegroundWindow(dialogHandle);
                 }
 
                 Thread.Sleep(500);
 
-                // 2. Отправляем путь в активное поле ввода через SendMessage
-                // Получаем текущий фокус (обычно это поле "Имя файла")
+                // 3. Вставляем путь напрямую через SendMessage
                 IntPtr focusedControl = GetFocus();
 
                 if (focusedControl != IntPtr.Zero)
                 {
-                    // Прямая отправка текста в контрол
+                    // Прямая отправка текста в поле ввода
                     SendMessage(focusedControl, WM_SETTEXT, IntPtr.Zero, filePath);
-                    Thread.Sleep(200);
+                    Thread.Sleep(300);
 
-                    // Нажимаем Enter, чтобы применить
+                    // Нажимаем Enter
                     SendMessage(focusedControl, WM_KEYDOWN, (IntPtr)0x0D, IntPtr.Zero);
                     SendMessage(focusedControl, WM_KEYUP, (IntPtr)0x0D, IntPtr.Zero);
                 }
                 else
                 {
-                    // Если фокус не найден, используем старый метод (но с задержкой)
+                    // Запасной вариант: копируем в буфер и вставляем
                     Clipboard.SetText(filePath);
                     Thread.Sleep(300);
                     SendKeys.SendWait("^v");

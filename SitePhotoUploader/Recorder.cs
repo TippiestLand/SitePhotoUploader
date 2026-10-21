@@ -221,13 +221,15 @@ namespace SitePhotoUploader
 
                                 _uiControl?.Invoke(new Action(() =>
                                 {
+                                    // 1. Кликаем по полю ввода (по сохраненным координатам)
                                     ClickAt(step.InputPosition);
                                     Thread.Sleep(step.DelayMs);
 
-                                    // ИСПРАВЛЕННЫЙ ВЫЗОВ МЕТОДА
+                                    // 2. Вставляем путь напрямую (через WinAPI)
                                     dialogHelper.InsertPathIntoSaveDialog(path, step.DelayMs);
 
                                     Thread.Sleep(step.DelayMs);
+                                    // 3. Кликаем по кнопке открытия
                                     ClickAt(step.OpenButtonPosition);
                                 }));
 
