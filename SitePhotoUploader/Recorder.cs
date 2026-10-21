@@ -223,7 +223,10 @@ namespace SitePhotoUploader
                                 {
                                     ClickAt(step.InputPosition);
                                     Thread.Sleep(step.DelayMs);
-                                    dialogHelper.InsertPath(path);
+
+                                    // ИСПРАВЛЕННЫЙ ВЫЗОВ МЕТОДА
+                                    dialogHelper.InsertPathIntoSaveDialog(path, step.DelayMs);
+
                                     Thread.Sleep(step.DelayMs);
                                     ClickAt(step.OpenButtonPosition);
                                 }));
@@ -244,7 +247,6 @@ namespace SitePhotoUploader
                                         if (edgeHandle != IntPtr.Zero) SetForegroundWindow(edgeHandle);
                                         Thread.Sleep(500);
 
-                                        // 1. Выделяем
                                         for (int i = 0; i < step.ClickCount; i++)
                                         {
                                             ClickAt(step.Position);
@@ -252,24 +254,18 @@ namespace SitePhotoUploader
                                         }
                                         Thread.Sleep(300);
 
-                                        // 2. ПКМ
                                         RightClickAt(step.Position);
-
-                                        // 3. Задержка
                                         Thread.Sleep(1000);
 
-                                        // 4. Стрелки вниз
                                         for (int i = 0; i < step.DownArrowCount; i++)
                                         {
                                             SendKeys.SendWait("{DOWN}");
                                             Thread.Sleep(200);
                                         }
 
-                                        // 5. Enter
                                         SendKeys.SendWait("{ENTER}");
                                         Thread.Sleep(500);
 
-                                        // 6. Читаем
                                         if (Clipboard.ContainsText())
                                         {
                                             link = Clipboard.GetText().Trim();
