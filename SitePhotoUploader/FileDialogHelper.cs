@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -7,81 +6,41 @@ namespace SitePhotoUploader
 {
     public class FileDialogHelper
     {
-        private const int WM_SETTEXT = 0x000C;
-        private const int WM_KEYDOWN = 0x0100;
-        private const int WM_KEYUP = 0x0101;
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr WindowFromPoint(POINT point);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetFocus();
-
-        [DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT { public int X; public int Y; }
-
         public void InsertPathIntoSaveDialog(string filePath, int delayMs)
         {
             try
             {
-                // 1. Ищем окно Проводника (Open/Открыть)
-                IntPtr dialogHandle = IntPtr.Zero;
-                DateTime endTime = DateTime.Now.AddSeconds(5);
+                // 1. Ждем, пока окно Проводника точно появится
+                Thread.Sleep(1000);
 
-                while (DateTime.Now < endTime)
+                // 2. Очищаем текущее поле (Ctrl+A, Delete)
+                SendKeys.SendWait("^a");
+                Thread.Sleep(200);
+                SendKeys.SendWait("{DEL}");
+                Thread.Sleep(200);
+
+                // 3. Вводим путь посимвольно (это обходит проблему с буфером)
+                foreach (char c in filePath)
                 {
-                    dialogHandle = FindWindow("#32770", "Открыть");
-                    if (dialogHandle == IntPtr.Zero)
-                        dialogHandle = FindWindow("#32770", "Open");
+                    if (c == '\\')
+                        SendKeys.SendWait("{\\}");
+                    else if (c == ':')
+                        SendKeys.SendWait("{:}");
+                    else
+                        SendKeys.SendWait(c.ToString());
 
-                    if (dialogHandle != IntPtr.Zero) break;
-                    Thread.Sleep(300);
-                }
-
-                if (dialogHandle != IntPtr.Zero)
-                {
-                    // 2. Активируем окно
-                    SetForegroundWindow(dialogHandle);
+                    Thread.Sleep(10); // Небольшая пауза между символами
                 }
 
                 Thread.Sleep(500);
 
-                // 3. Вставляем путь напрямую через SendMessage
-                IntPtr focusedControl = GetFocus();
-
-                if (focusedControl != IntPtr.Zero)
-                {
-                    // Прямая отправка текста в поле ввода
-                    SendMessage(focusedControl, WM_SETTEXT, IntPtr.Zero, filePath);
-                    Thread.Sleep(300);
-
-                    // Нажимаем Enter
-                    SendMessage(focusedControl, WM_KEYDOWN, (IntPtr)0x0D, IntPtr.Zero);
-                    SendMessage(focusedControl, WM_KEYUP, (IntPtr)0x0D, IntPtr.Zero);
-                }
-                else
-                {
-                    // Запасной вариант: копируем в буфер и вставляем
-                    Clipboard.SetText(filePath);
-                    Thread.Sleep(300);
-                    SendKeys.SendWait("^v");
-                    Thread.Sleep(300);
-                    SendKeys.SendWait("{ENTER}");
-                }
+                // 4. Нажимаем Enter для открытия
+                SendKeys.SendWait("{ENTER}");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Ошибка ввода: " + ex.Message);
+            }
         }
     }
 }
